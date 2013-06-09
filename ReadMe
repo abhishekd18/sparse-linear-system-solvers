@@ -11,5 +11,6 @@
 2. Type "make" and enter. The code will be compiled and executable will be created in /bin/.
 
 /* Instructions: How to run th program */
-1. Open the terminal in the main /Projec1/ folder.
+1. Open the terminal in the main /Project1/ folder.
 2. Run "./run.sh" in the terminal.
+3. "./run.sh" is configured so as to generate the data and plots required for this project.
