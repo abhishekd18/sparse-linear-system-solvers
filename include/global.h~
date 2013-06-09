@@ -1,0 +1,17 @@
+/* 
+*   Declaration of global data structures and variables 
+*/
+
+#ifndef GLOBAL_H
+#define GLOBAL_H
+
+//MTX MAT;
+
+char line[MM_MAX_LINE_LENGTH];
+char banner[MM_MAX_TOKEN_LENGTH];
+char mtx[MM_MAX_TOKEN_LENGTH]; 
+char crd[MM_MAX_TOKEN_LENGTH];
+char data_type[MM_MAX_TOKEN_LENGTH];
+char storage_scheme[MM_MAX_TOKEN_LENGTH];
+
+#endif
