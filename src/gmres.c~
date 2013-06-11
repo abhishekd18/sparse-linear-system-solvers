@@ -201,7 +201,7 @@ void get_Krylov(MTX *MAT, double** V, double** H, int j, char* preconditioner){
 		V[j+1][k] = w[k]/H[j+1][j];
 
 	// Check Orthogonality of Krylov vectors
-	if(fabs(scalarProd(V[j],V[j+1],MAT->nrows)) > eps)
+	if(scalarProd(V[j],V[j+1],MAT->nrows) > eps)
 		fprintf(stderr,"\nWarning: Krylov Vectors are not orthogonal! Scalar Product: %1.16E\n",scalarProd(V[j],V[j+1],MAT->nrows));
 
 	free(w);
