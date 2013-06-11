@@ -68,7 +68,7 @@ int main(int argc, char* argv[]){
 		int m = 1000;
 		clock_t start, end; 
 		start = clock();
-		rho = GMRES(&MAT, x0, xm, b, &m, tol, "Relative", argv[3], 1); 
+		rho = GMRES(&MAT, x0, xm, b, &m, tol, "Relative", argv[3], "full"); 
 		end = clock();
 		fprintf(stdout,"\n\nIterations = %d\tFinal Relative Residual = %e\tTime for computation = %lf s\n"\
 				,m,rho,(end-start)/(double)CLOCKS_PER_SEC);

@@ -7,7 +7,15 @@
 
 /*
 *	Conjugate Gradient
+*	
+*	MAT		:	Data structure of type MTX
+*	x0 		:	Initial guess vector
+*	xm 		:	Computed Solution vector
+*	b 		:	Right hand side vector
+*	iter 		:	No. of iterations
+*	tol		:	Stopping tolerence
 */
+
 double CG(MTX *MAT, double* x0, double* xm, double* b, int *iter, double tol){
 	*iter = 0;
 
@@ -44,8 +52,7 @@ double CG(MTX *MAT, double* x0, double* xm, double* b, int *iter, double tol){
 	double* Aerror = (double*) malloc(MAT->ncols*sizeof(double));
 
 	// Print Error Vs. Iteration in a file
-	FILE* fp = fopen("./Output/Error_CG_Anorm.out","a");
-	FILE* fp1 = fopen("./Output/Error_CG.out","a");
+	FILE* fp = fopen("./Output/Error_CG.out","a");
 
 	while((residual/residual0)>tol){
 
@@ -96,12 +103,11 @@ double CG(MTX *MAT, double* x0, double* xm, double* b, int *iter, double tol){
 		Err_Anorm = pow(Err_Anorm,0.5);
 		Err = vecnorm(error,MAT->nrows);
 
-		fprintf(fp,"%d\t%1.16E\n", *iter, Err_Anorm);
-		fprintf(fp1,"%d\t%1.16E\t%1.16E\n", *iter, Err, residual/residual0);
+		// Write :	Iteration No.	Error-A-Norm	Error-2-Norm	Rel Residual	Abs Residual
+		fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\t%1.16E\n", *iter, Err_Anorm, Err, residual/residual0, residual);
 	}
 	
 	fclose(fp);
-	fclose(fp1);
 
 	free(rm);
 	free(pm);

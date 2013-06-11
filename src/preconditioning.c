@@ -14,8 +14,10 @@ void LeftPreconditioning(MTX *MAT, double* vec, char* preconditioner){
 
 		for(int j=0;j<MAT->nrows;j++)
 			for(int i=MAT->row_ptr[j];i<MAT->row_ptr[j+1];i++)
-				if(MAT->JA[i]==j)
+				if(MAT->JA[i]==j){
 					vec[j] = vec[j]/MAT->val[i];
+					break;				
+				}
 	
 	}else if(strcmp(preconditioner,"GAUSS_SEIDEL") == 0){
 

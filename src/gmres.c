@@ -7,10 +7,22 @@
 
 #define eps 1.0E-12
 
+int flag = 0;
+
 /*
 *	Full GMRES computation
+*	
+*	MAT		:	Data structure of type MTX
+*	x0 		:	Initial guess vector
+*	xm 		:	Computed Solution vector
+*	b 		:	Right hand side vector
+*	m 		:	No. of Krylov vectors/No. of iterations
+*	tol		:	Stopping tolerence
+*	res 		:	Type of residual to be monitored for convergence- "Absolute" or "Relative"
+*	preconditioner	: 	Type of preconditioner to be applied
+*	mode 		:	Operation mode for GMRES- "full" or "restarted"
 */
-double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, int flag){
+double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, char* mode){
 	
 	// Allocate memory for residual vector r0
 	double* r0 = (double*) malloc(MAT->ncols*sizeof(double));
@@ -81,16 +93,18 @@ double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, ch
 		if(strcmp(res,"Relative")==0){
 			rresidual = fabs(g[j+1])/residual0;
 			fprintf(stdout,"m = %d\tRelative Residual = %lg\n",j+1,rresidual);
-		}
-		else if(strcmp(res,"Absolute")==0){
+		}else if(strcmp(res,"Absolute")==0){
 			rresidual = fabs(g[j+1]);
-		}else
+		}else{
 			fprintf(stderr,"\nPlease check the type of residual to be specified. Keywords to be used are:\n \"Absolute\"\tOR\t\"Relative\"");
+			exit(1);
+		}
 
-		if(rresidual<tol){	
-			*m=j+1;
-			break;
-		}	
+		if(strcmp(mode,"full")==0)		
+			if(rresidual<tol){	
+				*m=j+1;
+				break;
+			}	
 
 		// Calculate xm = x0 + V*y
 		get_solution(MAT, R, V, g, j, x0, xm);
@@ -103,8 +117,18 @@ double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, ch
 		// Err = ||x-xm||
 		Err = vecnorm(error,MAT->ncols);
 
-		fprintf(fp,"%d\t%1.16E\t%1.16E\n",(*m*(flag-1)+j)*flag,Err,rresidual);
+		// Write :	Iteration No.	Error-2-Norm	Rel Residual	Abs Residual
+		if(strcmp(res,"Relative")==0){
+			fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual, rresidual*residual0);
+		}else if(strcmp(res,"Absolute")==0){
+			fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual/residual0, rresidual);
+		}
+
 	}
+
+		if(strcmp(mode,"restarted")==0)
+			flag++; 
+		fprintf(stdout,"\n%d\n",flag);
 
 	fclose(fp);
 	
@@ -232,7 +256,7 @@ return;
 *	Restarted formulation : GMRES
 */
 double GMRES_Restarted(MTX *MAT, double* x0, double* xm, double* b, int m, int* iter, double tol, char* preconditioner){
-	double rho = 1.0;
+	double rho = 1000.0;
 	*iter = 0;
 	// Allocate memory for residual vector r0
 	double* r0 = (double*) malloc(MAT->ncols*sizeof(double));
@@ -251,11 +275,13 @@ double GMRES_Restarted(MTX *MAT, double* x0, double* xm, double* b, int m, int* 
 	fp = fopen("./Output/Error_GMRES_Restarted.out","a");
 
 	double* error = (double*) malloc(MAT->ncols*sizeof(double));
-	double Err;
-	
+	double Err=1.0;
+
+	fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", 1, Err, rho/residual0, rho);
+
 	while(rho/residual0>tol){
 		*iter=*iter+1;
-		rho = GMRES(MAT, x0, xm, b, &m, tol, "Absolute",preconditioner,*iter);
+		rho = GMRES(MAT, x0, xm, b, &m, tol, "Absolute", preconditioner,"restarted");
 		
 		fprintf(stdout,"Iteration = %d\tRelative Residual = %lg\n",*iter,rho/residual0);
 		// error = x - xm
@@ -266,7 +292,8 @@ double GMRES_Restarted(MTX *MAT, double* x0, double* xm, double* b, int m, int* 
 		// Err = ||x-xm||
 		Err = vecnorm(error,MAT->ncols);
 
-		fprintf(fp,"%d\t%1.16E\t%1.16E\n",*iter*m,Err,rho/residual0);
+		// Write :	Iteration No.	Error-2-Norm	Rel Residual	Abs Residual
+		fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", *iter*m + 1, Err, rho/residual0, rho);
 
 		for(int i=0;i<MAT->ncols;i++)
 			x0[i] = xm[i];

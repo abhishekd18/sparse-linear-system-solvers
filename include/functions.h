@@ -39,7 +39,7 @@ void get_diag(MTX *MAT, double* diag);
 
 void LeftPreconditioning(MTX *MAT, double* vec, char* preconditioner);
 
-double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, int flag);
+double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, char* mode);
 
 void get_solution(MTX *MAT, double** R, double** V, double* g, int j, double* x0, double* xm);
 
