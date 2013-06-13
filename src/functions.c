@@ -327,12 +327,41 @@ return;
 }
 
 /*
+*	Check orthogonality of Krylov vectors
+*/
+void check_orthonormality(double **V, int m, int nrows, double eps){
+	int Orthogonality=1, Normality=1;
+	double prod;	
+
+	for(int i=0;i<m;i++)
+		for(int j=0;j<m;j++){
+			prod = scalarProd(V[i], V[j], nrows);
+
+			if((i==j)&&((pow(fabs(prod),0.5)>1+eps)||(pow(fabs(prod),0.5)<1-eps)))
+				Normality = 0;
+			if((i!=j)&&((prod>eps)||(prod<-eps)))	
+				Orthogonality = 0;
+		}
+
+	if((Orthogonality==1)&&(Normality==1))
+		fprintf(stdout,"\nKrylov Vectors are Orthonormal!\n");
+	if(Orthogonality==0)
+		fprintf(stdout,"\nWarning! Krylov Vectors are not Orthogonal! Error = %1.16E\n",eps);
+	if(Normality==0)
+		fprintf(stdout,"\nWarning! Krylov Vectors are not Normal! Error = %1.16E\n",eps);
+
+return;
+}
+
+/*
 *	Find best m corresponding to given expected minimum time
 */
 int Find_Best_m(MTX* MAT, double* x0, double* xm, double* b, int m, double tol, double t_min, char* preconditioner){
 
 	double t = 1000.0, rho = 1;
-	int iter = 0;
+	int iter = m;
+	char res_type[10] = "Relative";
+
 	clock_t start, end;
 
 	while(t>t_min){
@@ -343,24 +372,25 @@ int Find_Best_m(MTX* MAT, double* x0, double* xm, double* b, int m, double tol, 
 
 		start = clock();	
 
-		rho = GMRES_Restarted(MAT, x0, xm, b, m,  &iter, tol, preconditioner);
+		rho = GMRES(MAT, x0, xm, b, &iter, tol, res_type, preconditioner, "restarted"); 
 
 		end = clock();
 
-		m++;
-
+		m++;		
+	
 		t = (end-start)/(double)CLOCKS_PER_SEC;
 
+		if(t>t_min)	iter = m;
+
 		/* Stop if cannot find best m for given expected time within (no. of rows in Matrix)/8 sweeps*/
-		if(m > (MAT->nrows)/5 ){
+		if(m > (MAT->nrows)/10 ){
 			fprintf(stderr,"\nSorry! Coudn't find the best \"m\" for given expected minimum time\nCurrent time = %lf\n",t);
-			goto out;
+			t_min += 0.01;
+			m = 15;
 		}
 	}
 	
 	fprintf(stdout,"\nMinimum time for computation = %lf s for the best restart m = %d Iterations = %d\n", t, m-1, iter);
-
-out:
 
 return m;
 }

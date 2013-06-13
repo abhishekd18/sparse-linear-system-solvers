@@ -37,13 +37,13 @@ void Back_Substitute(double** R, int nRows, int nCols, double* invec, double* ou
 
 void get_diag(MTX *MAT, double* diag);
 
+void check_orthonormality(double **V, int m, int nrows, double eps);
+
 void LeftPreconditioning(MTX *MAT, double* vec, char* preconditioner);
 
 double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, char* mode);
 
 void get_solution(MTX *MAT, double** R, double** V, double* g, int j, double* x0, double* xm);
-
-double GMRES_Restarted(MTX *MAT, double* x0, double* xm, double* b, int m, int* iter, double tol, char* preconditioner);
 
 int Find_Best_m(MTX* MAT, double* x0, double* xm, double* b, int m, double tol, double t_min, char* preconditioner);
 

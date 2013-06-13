@@ -5,12 +5,8 @@
 #include "mmio.h"
 #include "functions.h"
 
-#define eps 1.0E-12
-
-int flag = 0;
-
 /*
-*	Full GMRES computation
+*	GMRES implementation
 *	
 *	MAT		:	Data structure of type MTX
 *	x0 		:	Initial guess vector
@@ -22,38 +18,21 @@ int flag = 0;
 *	preconditioner	: 	Type of preconditioner to be applied
 *	mode 		:	Operation mode for GMRES- "full" or "restarted"
 */
+
 double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, char* res, char* preconditioner, char* mode){
+	
+	if(strcmp(mode,"full")==0)	*m = 10000;
 	
 	// Allocate memory for residual vector r0
 	double* r0 = (double*) malloc(MAT->ncols*sizeof(double));
 
-	//r0 = A*x0
-	Mat_Vec_Mult(MAT,x0,r0);
-	
-	//r0 = b - A*x0
-	for(int i=0;i<MAT->ncols;i++)	
-		r0[i] = b[i] - r0[i];
-
-	// Preconditioning
-	if(strcmp(preconditioner,"NULL")!=0)	LeftPreconditioning(MAT,r0,preconditioner);		
-	
 	// Allocate memory for g
 	double* g = (double*) malloc((*m+1)*sizeof(double));
-
-	g[0] = vecnorm(r0,MAT->ncols);
-	double residual0 = g[0];
-	
-	for(int i=1;i<*m+1;i++)
-		g[i] = 0;
 
 	// Allocate memory for V
 	double** V = (double**) malloc((*m+1)*sizeof(double*));
 	for(int j=0;j<*m+1;j++)
 		V[j] = (double*) malloc(MAT->ncols*sizeof(double));
-	
-	// Calculate V[1] as r0/||r0||
-	for(int i=0;i<MAT->ncols;i++)
-		V[0][i] = r0[i]/residual0;
 
 	// Allocate memory for Hm
 	double** H = AllocateDynamicArray(*m+1,*m);
@@ -66,76 +45,139 @@ double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, ch
 	double *s = (double*) malloc(*m*sizeof(double));
 
 	double *error = (double*) malloc(MAT->ncols*sizeof(double));
-	double rresidual, Err;
+	double rho = 1.0, Err, rresidual, residual, residual0;
+	int flag = 0;
+
+	// Calculate Initial residual
+	//r0 = A*x0
+	Mat_Vec_Mult(MAT,x0,r0);
+	
+	//r0 = b - A*x0
+	for(int i=0;i<MAT->ncols;i++)	
+		r0[i] = b[i] - r0[i];
+
+	// res = ||r0||
+	residual0 = vecnorm(r0,MAT->ncols);
+
+	// residual for internal for loop
+	residual = residual0;
 
 	FILE *fp;
 	fp = fopen("./Output/Error_GMRES.out","a");
 
-	for(int j=0;j<*m;j++){
+	while(rho>tol){
 
-		get_Krylov(MAT,V,H,j,preconditioner);
-
-		R[0][j] = H[0][j];
-		for(int k=1;k<=j;k++){
-			Rk_1 = c[k-1]*R[k-1][j] + s[k-1]*H[k][j];
-			Rk = -s[k-1]*R[k-1][j] + c[k-1]*H[k][j];
-			
-			R[k-1][j] = Rk_1;
-			R[k][j] = Rk;
-		}
-		c[j] = R[j][j]/pow((R[j][j]*R[j][j] + H[j+1][j]*H[j+1][j]),0.5);
-		s[j] = H[j+1][j]/pow((R[j][j]*R[j][j] + H[j+1][j]*H[j+1][j]),0.5);
-		R[j][j] = c[j]*R[j][j] + s[j]*H[j+1][j];	
+		// Preconditioning
+		if(strcmp(preconditioner,"NULL")!=0){
+			LeftPreconditioning(MAT,r0,preconditioner);
+			residual = vecnorm(r0,MAT->ncols);
+		}		
 	
-		g[j+1] = -s[j]*g[j];
-		g[j] = c[j]*g[j];
+		g[0] = vecnorm(r0,MAT->ncols);
+		
+		for(int i=1;i<*m+1;i++)
+			g[i] = 0;
 
-		if(strcmp(res,"Relative")==0){
-			rresidual = fabs(g[j+1])/residual0;
-			fprintf(stdout,"m = %d\tRelative Residual = %lg\n",j+1,rresidual);
-		}else if(strcmp(res,"Absolute")==0){
-			rresidual = fabs(g[j+1]);
-		}else{
-			fprintf(stderr,"\nPlease check the type of residual to be specified. Keywords to be used are:\n \"Absolute\"\tOR\t\"Relative\"");
-			exit(1);
-		}
+		// Calculate V[1] as r0/||r0||
+		for(int i=0;i<MAT->ncols;i++)
+			V[0][i] = r0[i]/residual;
 
-		if(strcmp(mode,"full")==0)		
-			if(rresidual<tol){	
-				*m=j+1;
-				break;
+		for(int j=0;j<*m;j++){
+
+			get_Krylov(MAT,V,H,j,preconditioner);
+
+			R[0][j] = H[0][j];
+			for(int k=1;k<=j;k++){
+				Rk_1 = c[k-1]*R[k-1][j] + s[k-1]*H[k][j];
+				Rk = -s[k-1]*R[k-1][j] + c[k-1]*H[k][j];
+			
+				R[k-1][j] = Rk_1;
+				R[k][j] = Rk;
+			}
+			c[j] = R[j][j]/pow((R[j][j]*R[j][j] + H[j+1][j]*H[j+1][j]),0.5);
+			s[j] = H[j+1][j]/pow((R[j][j]*R[j][j] + H[j+1][j]*H[j+1][j]),0.5);
+			R[j][j] = c[j]*R[j][j] + s[j]*H[j+1][j];	
+	
+			g[j+1] = -s[j]*g[j];
+			g[j] = c[j]*g[j];
+
+			if(strcmp(res,"Relative")==0){
+				rresidual = fabs(g[j+1])/residual;
+				if(strcmp(mode,"full")==0)
+					fprintf(stdout,"m = %d\tRelative Residual = %lg\n",j+1,rresidual);
+				else
+					fprintf(stdout,"m = %d\tRelative Residual = %lg\n",j+1,rresidual*residual/residual0);
+			}else if(strcmp(res,"Absolute")==0){
+				rresidual = fabs(g[j+1]);
+				fprintf(stdout,"m = %d\tAbsolute Residual = %lg\n",j+1,rresidual);
+			}else{
+				fprintf(stderr,"\nPlease check the type of residual to be specified. \
+					Keywords to be used are:\n \"Absolute\"\tOR\t\"Relative\"");
+				exit(1);
+			}
+
+			if(strcmp(mode,"full")==0){
+				if(rresidual<tol){	
+					*m=j;	break;
+				}
 			}	
 
-		// Calculate xm = x0 + V*y
-		get_solution(MAT, R, V, g, j, x0, xm);
+			// Calculate xm = x0 + V*y
+			get_solution(MAT, R, V, g, j, x0, xm);
 
-		// error = x - xm
-		for(int i=0;i<MAT->ncols;i++){
-			error[i] = 1.0 - xm[i];
-		}
+			// error = x - xm
+			for(int i=0;i<MAT->ncols;i++){
+				error[i] = 1.0 - xm[i];
+			}
 
-		// Err = ||x-xm||
-		Err = vecnorm(error,MAT->ncols);
+			// Err = ||x-xm||
+			Err = vecnorm(error,MAT->ncols);
 
-		// Write :	Iteration No.	Error-2-Norm	Rel Residual	Abs Residual
+			// Write :	Iteration No.	Error-2-Norm	Rel Residual	Abs Residual
+			if(strcmp(res,"Relative")==0){
+				if(strcmp(mode,"full")==0)
+				fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual, rresidual*residual);
+				else
+				fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual*residual/residual0, rresidual*residual);
+			}else if(strcmp(res,"Absolute")==0){
+				fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual/residual0, rresidual);
+			}
+
+		}// for end
+
+
 		if(strcmp(res,"Relative")==0){
-			fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual, rresidual*residual0);
+			if(strcmp(mode,"full")==0)
+				rho = rresidual;
+			else			
+				rho = rresidual*residual/residual0;		
 		}else if(strcmp(res,"Absolute")==0){
-			fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", (*m*flag+j)+1, Err, rresidual/residual0, rresidual);
+			rho = rresidual;
 		}
 
-	}
+		flag++;
 
-		if(strcmp(mode,"restarted")==0)
-			flag++; 
+		// Calculate residual for next iteration
+		for(int i=0;i<MAT->ncols;i++)
+			x0[i] = xm[i];
+
+		//r = A*x0
+		Mat_Vec_Mult(MAT,x0,r0);
+	
+		//r = b - A*x0
+		for(int i=0;i<MAT->ncols;i++)	
+			r0[i] = b[i] - r0[i];
+
+		// res = ||r0||
+		residual = vecnorm(r0,MAT->ncols);
+
+	}// While end
 
 	fclose(fp);
+
+	double eps = 1.0e-3;	// Tolerance check
+	check_orthonormality(V, *m, MAT->nrows, eps);
 	
-	free(error);
-	free(r0);
-	free(c);
-	free(s);
-	free(g);
 	FreeDynamicArray(R,*m+1);
 	FreeDynamicArray(H,*m+1);
 	
@@ -143,7 +185,17 @@ double GMRES(MTX *MAT, double* x0, double* xm, double* b, int *m, double tol, ch
 		free(V[j]);
 	free(V);
 
-return rresidual;
+	// Assign cumulative value to m in case of restarted mode. 
+	int iter = (*m+1)*flag;
+	*m = iter;
+
+	free(error);
+	free(r0);
+	free(c);
+	free(s);
+	free(g);
+
+return rho;
 }
 
 /*
@@ -200,10 +252,6 @@ void get_Krylov(MTX *MAT, double** V, double** H, int j, char* preconditioner){
 	for(int k=0;k<MAT->ncols;k++)
 		V[j+1][k] = w[k]/H[j+1][j];
 
-	// Check Orthogonality of Krylov vectors
-	if(fabs(scalarProd(V[j],V[j+1],MAT->nrows)) > eps)
-		fprintf(stderr,"\nWarning: Krylov Vectors are not orthogonal! Scalar Product: %1.16E\n",scalarProd(V[j],V[j+1],MAT->nrows));
-
 	free(w);
 return;
 }
@@ -248,60 +296,4 @@ void Back_Substitute(double** R, int nRows, int nCols, double* invec, double* ou
 	
 	free(temp);
 return;
-}
-
-
-/*
-*	Restarted formulation : GMRES
-*/
-double GMRES_Restarted(MTX *MAT, double* x0, double* xm, double* b, int m, int* iter, double tol, char* preconditioner){
-	double rho = 1000.0;
-	*iter = 0;
-	// Allocate memory for residual vector r0
-	double* r0 = (double*) malloc(MAT->ncols*sizeof(double));
-
-	//r0 = A*x0
-	Mat_Vec_Mult(MAT,x0,r0);
-	
-	//r0 = b - A*x0
-	for(int i=0;i<MAT->ncols;i++)	
-		r0[i] = b[i] - r0[i];
-
-	double residual0 = vecnorm(r0,MAT->ncols);
-	int j = 0;
-
-	FILE *fp;
-	fp = fopen("./Output/Error_GMRES_Restarted.out","a");
-
-	double* error = (double*) malloc(MAT->ncols*sizeof(double));
-	double Err=1.0;
-
-	fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", 1, Err, rho/residual0, rho);
-
-	while(rho/residual0>tol){
-		*iter=*iter+1;
-		rho = GMRES(MAT, x0, xm, b, &m, tol, "Absolute", preconditioner,"restarted");
-		
-		fprintf(stdout,"Iteration = %d\tRelative Residual = %lg\n",*iter,rho/residual0);
-		// error = x - xm
-		for(int i=0;i<MAT->ncols;i++){
-			error[i] = 1.0 - xm[i];
-		}
-
-		// Err = ||x-xm||
-		Err = vecnorm(error,MAT->ncols);
-
-		// Write :	Iteration No.	Error-2-Norm	Rel Residual	Abs Residual
-		fprintf(fp,"%d\t%1.16E\t%1.16E\t%1.16E\n", *iter*m + 1, Err, rho/residual0, rho);
-
-		for(int i=0;i<MAT->ncols;i++)
-			x0[i] = xm[i];
-		//m++;
-	}
-	
-	fclose(fp);
-	free(r0);
-	free(error);
-
-return rho/residual0;
 }

@@ -58,42 +58,40 @@ int main(int argc, char* argv[]){
 	for(int i=0;i<MAT.ncols;i++)
 		x0[i] = 0.0;
 
-	// Final residual, rho and tolerence, tol
+	// Final residual, rho and tolerance, tol
 	double rho = 1, tol=1e-8;
 
 	if(strcmp(argv[2],"GMRES_FULL")==0){
 		/*-------------------------------------------------Full-GMRES-setup-start--------------------------------------------------*/
-
-		// Initially, m is set to large integer value.
-		int m = 1000;
+		int m;					// No. of Krylov vectors. This will be output.
+		char res_type[10] = "Relative";		// Monitor residual of this type for convergence
 		clock_t start, end; 
 		start = clock();
-		rho = GMRES(&MAT, x0, xm, b, &m, tol, "Relative", argv[3], "full"); 
+		rho = GMRES(&MAT, x0, xm, b, &m, tol, res_type, argv[3], "full"); 
 		end = clock();
-		fprintf(stdout,"\n\nIterations = %d\tFinal Relative Residual = %e\tTime for computation = %lf s\n"\
-				,m,rho,(end-start)/(double)CLOCKS_PER_SEC);
+		fprintf(stdout,"\n\nIterations = %d\tFinal %s Residual = %e\tTime for computation = %lf s\n"\
+				, m, res_type, rho, (end-start)/(double)CLOCKS_PER_SEC);
 		/*-------------------------------------------------Full-GMRES-setup-end----------------------------------------------------*/
 
 	}else if(strcmp(argv[2],"GMRES_RESTARTED")==0){
 		/*---------------------------------------------Restarted-GMRES-setup-start-------------------------------------------------*/
 
-		// Fastest: m=22 with modified restarted setting (~0.16 sec), Second fastest: m=77 with restarted setting (~0.19 sec)
-		//Revised Fastest: m=68 with modified restarted setting (~0.25 sec), Second fastest: m=29 with restarted setting (~0.25 sec)
-		
-		// Activate this block(line:85-87) to calculate the best restart parameter "m" and keep the rest commented
+		// Activate this block(line:81-83) to calculate the best restart parameter "m" and keep the rest commented
 		// Initial minimum "m" for restarted GMRES to converge for given tolerence
-		/*double t_min = 0.26; // Expected minimum time in seconds
-		int m = 15, iter = 0;
+		/*double t_min = 0.25; // Expected minimum time in seconds
+		int m = 15;
 		m = Find_Best_m(&MAT, x0, xm, b, m, tol, t_min, argv[3]);*/
 		
-		// Activate this block(line:90-96) when using GMRES Restarted with the best restart paramter
-		int m = 40, iter = 0;			
+		// Best found: m = 63 ~0.18 s, m = 40 ~0.26-0.27 s
+		// Activate this block(line:87-94) when using GMRES Restarted with the best restart paramter
+		int m = 40;				// Best m for minimum run time
+		char res_type[10] = "Relative";		// Monitor residual of this type for convergence			
 		clock_t start, end; 
 		start = clock();
-		rho = GMRES_Restarted(&MAT, x0, xm, b, m, &iter, tol, argv[3]);
+		rho = GMRES(&MAT, x0, xm, b, &m, tol, res_type, argv[3], "restarted"); 
 		end = clock();
-		fprintf(stdout,"\n\nIterations = %d\tFinal Relative Residual = %e\tTime for computation = %lf s\n"\
-				,iter,rho,(end-start)/(double)CLOCKS_PER_SEC);
+		fprintf(stdout,"\n\nIterations = %d\tFinal %s Residual = %e\tTime for computation = %lf s\n"\
+				, m, res_type, rho, (end-start)/(double)CLOCKS_PER_SEC);
 
 		/*---------------------------------------------Restarted-GMRES-setup-end---------------------------------------------------*/
 
